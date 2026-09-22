@@ -1,6 +1,4 @@
-const { checkInsta } = require("../helper/addon/insta/insta.js");
 const { checkTelePlugin } = require("../helper/addon/telegram/tele.js");
-const { checkWebPush } = require("../helper/addon/web-notification/webPush.js");
 
 function returnAddons() {
   const { checkQr } = require("../helper/addon/qr/index.js");
@@ -14,8 +12,6 @@ function returnAddons() {
   const waCallChceck = checkWaCall();
   const embedCheck = checkEmbed();
   const checkTele = checkTelePlugin();
-  const webPush = checkWebPush();
-  const checkInstagram = checkInsta();
 
   const finalAddon = [
     wooCheck && "WEBHOOK",
@@ -24,8 +20,6 @@ function returnAddons() {
     waCallChceck && "WACALL",
     embedCheck && "EMBED",
     checkTele && "TELEGRAM",
-    webPush && "WEB_NOTIFICATION",
-    checkInstagram && "INSTAGRAM",
   ].filter(Boolean);
 
   return finalAddon;

@@ -1,56 +1,83 @@
-require("dotenv").config({ silent: true });
+require("dotenv").config();
 const express = require("express");
+const app = express();
 const cors = require("cors");
-const fs = require("fs");
-const path = require("path");
 const fileUpload = require("express-fileupload");
-const nodeCleanup = require("node-cleanup");
 const { initCampaign } = require("./loops/campaignBeta.js");
+const nodeCleanup = require("node-cleanup");
 const { init, cleanup } = require("./helper/addon/qr");
+const path = require("path");
 const { warmerLoopInit } = require("./helper/addon/qr/warmer/index.js");
 const { initTele, cleanupTele } = require("./helper/addon/telegram/tele.js");
-const { updateLangJsonFromEnglish } = require("./utils/fun.js");
 
-const app = express();
-const currentDir = process.cwd();
-
-// ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+app.use(express.json());
 app.use(fileUpload());
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
-app.use("/api/user", require("./routes/user"));
-app.use("/api/web", require("./routes/web"));
-app.use("/api/admin", require("./routes/admin"));
-app.use("/api/phonebook", require("./routes/phonebook"));
-app.use("/api/chat_flow", require("./routes/chatFlow"));
-app.use("/api/inbox", require("./routes/inbox"));
-app.use("/api/templet", require("./routes/templet"));
-app.use("/api/chatbot", require("./routes/chatbot"));
-app.use("/api/broadcast", require("./routes/broadcast"));
-app.use("/api/v1", require("./routes/apiv2"));
-app.use("/api/agent", require("./routes/agent"));
-app.use("/api/qr", require("./routes/qr"));
-app.use("/api/ai", require("./routes/ai"));
-app.use("/api/webhook", require("./routes/webhook"));
-app.use("/api/wa_call", require("./routes/waCall"));
-app.use("/api/telegram", require("./routes/telegram"));
-app.use("/api/theme", require("./routes/theme"));
-app.use("/api/insta", require("./routes/insta"));
-app.use("/api/kaban", require("./routes/kaban"));
-app.use("/api/waform", require("./routes/waform"));
+// routers
+const userRoute = require("./routes/user");
+app.use("/api/user", userRoute);
 
-// ─── Media Streaming Middleware ───────────────────────────────────────────────
+const webRoute = require("./routes/web");
+app.use("/api/web", webRoute);
+
+const adminRoute = require("./routes/admin");
+app.use("/api/admin", adminRoute);
+
+const phonebookRoute = require("./routes/phonebook");
+app.use("/api/phonebook", phonebookRoute);
+
+const chat_flowRoute = require("./routes/chatFlow");
+app.use("/api/chat_flow", chat_flowRoute);
+
+const inboxRoute = require("./routes/inbox");
+app.use("/api/inbox", inboxRoute);
+
+const templetRoute = require("./routes/templet");
+app.use("/api/templet", templetRoute);
+
+const chatbotRoute = require("./routes/chatbot");
+app.use("/api/chatbot", chatbotRoute);
+
+const broadcastRoute = require("./routes/broadcast");
+app.use("/api/broadcast", broadcastRoute);
+
+const apiRoute = require("./routes/apiv2");
+app.use("/api/v1", apiRoute);
+
+const agentRoute = require("./routes/agent");
+app.use("/api/agent", agentRoute);
+
+const qrRoute = require("./routes/qr");
+app.use("/api/qr", qrRoute);
+
+const aiRoute = require("./routes/ai");
+app.use("/api/ai", aiRoute);
+
+const webhookAutomationRoute = require("./routes/webhook");
+app.use("/api/webhook", webhookAutomationRoute);
+
+const waCallRoute = require("./routes/waCall");
+app.use("/api/wa_call", waCallRoute);
+
+const teleRoute = require("./routes/telegram");
+app.use("/api/telegram", teleRoute);
+
+const currentDir = process.cwd();
+
+// Helper function for media streaming middleware
 const createMediaMiddleware = (folderPath) => {
   const mimeTypes = {
-    // Video
+    // Video formats
     ".mp4": "video/mp4",
     ".webm": "video/webm",
     ".mov": "video/quicktime",
     ".avi": "video/x-msvideo",
-    // Audio
+    // Audio formats
     ".mp3": "audio/mpeg",
     ".ogg": "audio/ogg",
     ".opus": "audio/opus",
@@ -61,13 +88,16 @@ const createMediaMiddleware = (folderPath) => {
 
   return express.static(path.resolve(currentDir, folderPath), {
     setHeaders: (res, filePath) => {
+      // Enable range requests for streaming
       res.setHeader("Accept-Ranges", "bytes");
 
+      // Set content type based on file extension
       const ext = path.extname(filePath).toLowerCase();
       if (mimeTypes[ext]) {
         res.setHeader("Content-Type", mimeTypes[ext]);
       }
 
+      // Cache control & CORS headers
       res.setHeader("Cache-Control", "public, max-age=31536000");
       res.setHeader("Access-Control-Allow-Origin", "*");
       res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
@@ -81,31 +111,28 @@ const createMediaMiddleware = (folderPath) => {
 app.use("/media", createMediaMiddleware("./client/public/media"));
 app.use("/meta-media", createMediaMiddleware("./client/public/meta-media"));
 
-// ─── Static & Catch-All ───────────────────────────────────────────────────────
 app.use(express.static(path.resolve(currentDir, "./client/public")));
 
 app.get("*", function (request, response) {
   response.sendFile(path.resolve(currentDir, "./client/public", "index.html"));
 });
 
-// ─── Server ───────────────────────────────────────────────────────────────────
 const server = app.listen(process.env.PORT || 3010, () => {
   console.log(`WaCrm server is running on port ${process.env.PORT}`);
-  updateLangJsonFromEnglish();
-  // init();
-  // setTimeout(() => {
-  //   warmerLoopInit();
-  //   initCampaign();
-  //   initTele();
-  // }, 1000);
+  init();
+  setTimeout(() => {
+    warmerLoopInit();
+    initCampaign();
+    initTele();
+  }, 1000);
 });
 
-// ─── Socket.IO ────────────────────────────────────────────────────────────────
+// Initialize Socket.IO after server is running
 const io = require("./socket").initializeSocket(server);
 module.exports = io;
 
-// ─── Cleanup ──────────────────────────────────────────────────────────────────
+// Update cleanup
 nodeCleanup(async (exitCode, signal) => {
-  await cleanupTele();
-  cleanup();
+  await cleanupTele(); // Cleanup Telegram
+  cleanup(); // Your existing cleanup
 });
